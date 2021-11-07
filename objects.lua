@@ -15,7 +15,7 @@ physicsObjects.category = {redBall = 1, blueBall = 2, platform = 3, ground = 4}
 --initialize empty red ball
 physicsObjects.redBall = {}
 --make red ball body
-physicsObjects.redBall.body = love.physics.newBody(world, love.graphics.getWidth() / 2 , love.graphics.getHeight() - 200, "dynamic");
+physicsObjects.redBall.body = love.physics.newBody(world, love.graphics.getWidth() / 4 , love.graphics.getHeight() - 200, "dynamic");
 --make red ball shape
 physicsObjects.redBall.shape = love.physics.newRectangleShape(60, 5);
 --make red ball fixture
@@ -61,8 +61,8 @@ function CreateTerrain(_x, _y)
     --Create a list of points, starting at (0,0), ending at (love.graphics.getWidth(), 0), with a random height between -10 and 10
     local terrainPoints = {}
     for i = 0, love.graphics.getWidth(), 1 do
-        table.insert(terrainPoints, _x + (i * 20))
-        table.insert(terrainPoints, _y + (i == 0 and 0 or math.random(-100, 100)) + i*5)
+        table.insert(terrainPoints, _x + (i * 40))
+        table.insert(terrainPoints, _y + ((i == 0 and 0 or math.random(-100, 1000)) + i*10) * 2) 
     end
 
     --loop through the list of points and average the height based on the points around it

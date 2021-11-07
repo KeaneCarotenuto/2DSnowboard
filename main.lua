@@ -25,6 +25,8 @@ local realY = 0
 local isGrounded = false
 local spaceHeld = false
 
+local maxVel = 800
+
 local particleSystem
 
 function Lerp(a, b, t)
@@ -69,8 +71,9 @@ function love.load(arg)
 	particleSystem:setEmissionRate(150)
 	particleSystem:setParticleLifetime(0.1, 0.5)
 	particleSystem:setSizes(2)
-	particleSystem:setSpread(2*math.pi)
-	particleSystem:setSpeed(20, 30)
+	particleSystem:setSpread(math.rad(90))
+    particleSystem:setDirection(math.rad(-45))
+	particleSystem:setSpeed(100, 100)
 	particleSystem:setColors(1,1,1,1)
 end
 
@@ -81,16 +84,19 @@ end
 function love.update(dt)
     --update the physics world
     world:update(dt)
-    
-    --If the A and D keys are pressed, apply torque to the ball to rotate it
-    if love.keyboard.isDown("a") then
-        physicsObjects.redBall.body:applyTorque(-100)
-    end
-    if love.keyboard.isDown("d") then
-        physicsObjects.redBall.body:applyTorque(100)
-    end
 
     redBallRot = physicsObjects.redBall.body:getAngle()
+    --convert the angle to degrees
+    local degrees = math.deg(redBallRot)
+    degrees = math.fmod(degrees, 360)
+    --clamp the degrees between -180 and 180
+    if degrees > 180 then
+        degrees = degrees - 360
+    elseif degrees < -180 then
+        degrees = degrees + 360
+    end
+    redBallRot = math.rad(degrees)
+
     redBallX, redBallY = physicsObjects.redBall.body:getPosition()
     localX = math.cos(redBallRot + math.rad(90)) * -20
     localY = math.sin(redBallRot + math.rad(90)) * -20
@@ -104,17 +110,24 @@ function love.update(dt)
     local lastX = terrainPoints[#terrainPoints-1]
     local lastY = terrainPoints[#terrainPoints]
 
+    local prevX = 0
+    local prevY = 0
+    
+    local nextX = 0
+    local nextY = 0
+
     local nearestX = 0
     local nearestY = 0
+
 
     --Find the nearest terrain point that the ball is on
     for i = 1, #terrainPoints, 2 do
         if terrainPoints[i] > redBallX then
-            local prevX = terrainPoints[i-2]
-            local prevY = terrainPoints[i-1] + physicsObjects.terrain.body:getY()
+            prevX = terrainPoints[i-2]
+            prevY = terrainPoints[i-1] + physicsObjects.terrain.body:getY()
             
-            local nextX = terrainPoints[i]
-            local nextY = terrainPoints[i+1] + physicsObjects.terrain.body:getY()
+            nextX = terrainPoints[i]
+            nextY = terrainPoints[i+1] + physicsObjects.terrain.body:getY()
             
             nearestX = Lerp(prevX, nextX, (redBallX - prevX)/(nextX - prevX))
             nearestY = Lerp(prevY, nextY, (redBallX - prevX)/(nextX - prevX))
@@ -122,9 +135,16 @@ function love.update(dt)
         end
     end
 
+    --calculate the normal of the terrain at the nearest point
+    local normalX = -(nextY - prevY)
+    local normalY = (nextX - prevX)
+    local normalLength = math.sqrt(normalX^2 + normalY^2)
+    normalX = normalX/normalLength
+    normalY = normalY/normalLength
+
     --ground check position
-    local groundCheckX = redBallX - localX/2
-    local groundCheckY = redBallY - localY/2
+    groundCheckX = redBallX - localX/2
+    groundCheckY = redBallY - localY/2
 
     if groundCheckY <= nearestY then
         isGrounded = false
@@ -132,32 +152,56 @@ function love.update(dt)
         isGrounded = true
     end
 
+    local moving = false
+    --If the A and D keys are pressed, apply torque to the ball to rotate it
+    if love.keyboard.isDown("a") then
+        physicsObjects.redBall.body:applyTorque(-100)
+        moving = true
+    end
+    if love.keyboard.isDown("d") then
+        physicsObjects.redBall.body:applyTorque(100)
+        moving = true
+    end
 
     --if space is pressed, apply an inital impulse to the physicsObjects.redBall, which will make it jump, if it is held down, it will make it jump higher
     if love.keyboard.isDown("space") then
-        if not spaceHeld then
+        if isGrounded and not spaceHeld then
             physicsObjects.redBall.body:applyLinearImpulse(0, -30)
-            spaceHeld = true
         else
             local mass = physicsObjects.redBall.body:getMass()
-            physicsObjects.redBall.body:applyForce(0, -10000 * dt * mass)
-            physicsObjects.redBall.body:applyTorque(-100)
+            physicsObjects.redBall.body:applyForce(0, -100 * mass)
         end
+        
+        moving = true
+        spaceHeld = true
     else 
-        physicsObjects.redBall.body:setAngularVelocity(physicsObjects.redBall.body:getAngularVelocity() - (physicsObjects.redBall.body:getAngularVelocity() * dt * 1))
+        
+        --apply torque to rotate the redBall towards up
+        -- local angleDiff = (0 - redBallRot)
+        -- local force = angleDiff * 10
+        -- physicsObjects.redBall.body:applyTorque(force)
         spaceHeld = false
     end
 
+    if not moving then
+        physicsObjects.redBall.body:setAngularVelocity(physicsObjects.redBall.body:getAngularVelocity() - (physicsObjects.redBall.body:getAngularVelocity() * dt * 2))
+    end
+
+    --apply linear drag to the redBall
+    physicsObjects.redBall.body:applyForce(-physicsObjects.redBall.body:getLinearVelocity() * 0.01, 0)
+
+
     --cap the speed of the physicsObjects.redBall to 200
-    if physicsObjects.redBall.body:getLinearVelocity() > 800 then
+    if physicsObjects.redBall.body:getLinearVelocity() > maxVel then
         local x, y = physicsObjects.redBall.body:getLinearVelocity()
-        physicsObjects.redBall.body:setLinearVelocity(800, y)
+        physicsObjects.redBall.body:setLinearVelocity(maxVel, y)
     end
 
     --cap the rotational speed of the physicsObjects.redBall to 20
     if physicsObjects.redBall.body:getAngularVelocity() < math.rad(-180) then
         physicsObjects.redBall.body:setAngularVelocity(math.rad(-180))
     end
+
 
     --if the last x position is less than the redBall x position
     if lastX < physicsObjects.redBall.body:getX() then
@@ -173,8 +217,8 @@ function love.update(dt)
         
     end
 
-    local partX = math.cos(redBallRot) * -25
-    local partY = math.sin(redBallRot) * -25
+    local partX = math.cos(redBallRot) * 25
+    local partY = math.sin(redBallRot) * 25
     partX = redBallX + partX
     partY = redBallY + partY
 
@@ -189,15 +233,16 @@ function love.update(dt)
 
     --follow the player with the camera
     cam:lookAt(physicsObjects.redBall.body:getX(), physicsObjects.redBall.body:getY())
+    --calculate how fast the redBall is moving compared to the maxVel
+    local speed = physicsObjects.redBall.body:getLinearVelocity()
+    local speedPercent = speed/maxVel
+    --set the camera zoom based on the speed of the redBall
+    local newZoom = 1.25 - (speedPercent)/2
+    cam:zoomTo(Lerp(cam.scale, newZoom, dt))
+    
 end
 
 function love.draw()
-    --draw the FPS
-    love.graphics.setColor(0, 0, 0)
-    love.graphics.print("FPS: "..tostring(love.timer.getFPS()), 10, 10)
-    love.graphics.setColor(255, 255, 255)
-    love.graphics.print("FPS: "..tostring(love.timer.getFPS()), 9, 9)
-
     cam:attach()
 
     --draw the ground green
@@ -208,27 +253,60 @@ function love.draw()
     love.graphics.setColor(128, 128, 128)
     love.graphics.polygon("fill", physicsObjects.platform.body:getWorldPoints(physicsObjects.platform.shape:getPoints()))
 
-    --draw the redBall red
-    love.graphics.setColor(255, 0, 0)
-    love.graphics.polygon("line", physicsObjects.redBall.body:getWorldPoints(physicsObjects.redBall.shape:getPoints()))
-
-    --draw a blue circle upwards of the redBall
-    love.graphics.setColor(0, 0, 255)
-    love.graphics.circle("line", realX, realY, 10)
+    --draw a line from the redBall to the groundCheck point
+    -- love.graphics.setColor(255, 0, 0)
+    -- love.graphics.line(redBallX, redBallY, groundCheckX, groundCheckY)
 
     --draw the blueBall blue
     love.graphics.setColor(0, 0, 255)
     love.graphics.circle("fill", physicsObjects.blueBall.body:getX(), physicsObjects.blueBall.body:getY(), physicsObjects.blueBall.shape:getRadius())
 
-    --draw the terrain white
-    love.graphics.setColor(255, 255, 255)
-    love.graphics.line(physicsObjects.terrain.body:getWorldPoints(physicsObjects.terrain.shape:getPoints()))
+    --Store terrain points temporarily
+    local terrainPoints = {}
+    terrainPoints = {physicsObjects.terrain.body:getWorldPoints(physicsObjects.terrain.shape:getPoints())}
+    --for each point in the terrainPoints table
+    for i = 3, #terrainPoints, 2 do
+        local depth = 2000
+        local snowHieght = 5
+        local snowThickness = 100
+        local p1x = terrainPoints[i-2]
+        local p1y = terrainPoints[i-1]
+        local p2x = terrainPoints[i]
+        local p2y = terrainPoints[i+1]
+
+        local p1ybot = p1y + depth
+        local p2ybot = p2y + depth
+
+        --Draw rock
+        love.graphics.setColor(0.5, 0.5, 0.5)
+        love.graphics.polygon("fill", {p1x, p1y, p2x, p2y, p2x, p2ybot, p1x, p1ybot})
+
+        --compare against noise function, to randomly add some snow circles on the surface
+        local noise = love.math.noise(p1x, p1y)
+        local noise2 = love.math.noise(p1x + 10, p1y + 10)
+        if noise > 0.5 then
+            love.graphics.setColor(0.9, 0.9, 0.9)
+            love.graphics.circle("fill", (p1x + p2x) / 2, (p1y + p2y)/2 + snowHieght, noise2 * 20)
+        end
+
+        --draw consistent snow
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.polygon("fill", {p1x, p1y - snowHieght, p2x, p2y - snowHieght, p2x, p2y + snowThickness, p1x, p1y + snowThickness})
+    end
 
     --draw the oldTerrain purple (if it exists)
     if physicsObjects.oldTerrain ~= nil then
         love.graphics.setColor(128, 0, 128)
         love.graphics.line(physicsObjects.oldTerrain.body:getWorldPoints(physicsObjects.oldTerrain.shape:getPoints()))
     end
+
+    --draw the redBall red
+    love.graphics.setColor(1, 0, 0)
+    love.graphics.polygon("fill", physicsObjects.redBall.body:getWorldPoints(physicsObjects.redBall.shape:getPoints()))
+
+    --draw a blue circle upwards of the redBall
+    love.graphics.setColor(0, 0, 1)
+    love.graphics.circle("fill", realX, realY, 10)
 
     -- Draw the particle system. Note that we don't need to give the draw()
 	-- function any coordinates here as all individual particles have their
@@ -237,4 +315,10 @@ function love.draw()
 	love.graphics.draw(particleSystem)
 
     cam:detach()
+
+    --draw the FPS
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.print("FPS: "..tostring(love.timer.getFPS()), 10, 10)
+    love.graphics.setColor(255, 255, 255)
+    love.graphics.print("FPS: "..tostring(love.timer.getFPS()), 9, 9)
 end
