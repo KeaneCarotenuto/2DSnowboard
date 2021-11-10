@@ -13,42 +13,20 @@ physicsObjects.category = {redBall = 1, blueBall = 2, platform = 3, ground = 4}
 -- physicsObjects.ground.fixture:setCategory(physicsObjects.category.ground);
 
 --initialize empty red ball
-physicsObjects.redBall = {}
+physicsObjects.board = {}
 --make red ball body
-physicsObjects.redBall.body = love.physics.newBody(world, love.graphics.getWidth() / 4 , love.graphics.getHeight() - 200, "dynamic");
+physicsObjects.board.body = love.physics.newBody(world, love.graphics.getWidth() / 2 , love.graphics.getHeight() - 200, "dynamic");
 --make red ball shape
-physicsObjects.redBall.shape = love.physics.newRectangleShape(60, 5);
+physicsObjects.board.shape = love.physics.newRectangleShape(60, 5);
 --make red ball fixture
-physicsObjects.redBall.fixture = love.physics.newFixture(physicsObjects.redBall.body, physicsObjects.redBall.shape, 1);
+physicsObjects.board.fixture = love.physics.newFixture(physicsObjects.board.body, physicsObjects.board.shape, 1);
 --make ball bouncy
-physicsObjects.redBall.fixture:setRestitution(0.0);
+physicsObjects.board.fixture:setRestitution(0.0);
 --low friction
-physicsObjects.redBall.fixture:setFriction(0.0);
-physicsObjects.redBall.fixture:setCategory(physicsObjects.category.redBall);
+physicsObjects.board.fixture:setFriction(0.0);
+physicsObjects.board.fixture:setCategory(physicsObjects.category.redBall);
 --red ball doesnt collide with platform
-physicsObjects.redBall.fixture:setMask(physicsObjects.category.platform);
-
---initialize empty blue ball
-physicsObjects.blueBall = {}
---make blue ball body
-physicsObjects.blueBall.body = love.physics.newBody(world, love.graphics.getWidth() / 2 - 50 , love.graphics.getHeight() - 200, "dynamic");
---make blue ball shape
-physicsObjects.blueBall.shape = love.physics.newCircleShape(10);
---make blue ball fixture
-physicsObjects.blueBall.fixture = love.physics.newFixture(physicsObjects.blueBall.body, physicsObjects.blueBall.shape, 1);
---make ball bouncy
-physicsObjects.blueBall.fixture:setRestitution(0.6);
-physicsObjects.blueBall.fixture:setCategory(physicsObjects.category.blueBall);
-
---initialize empty platform
-physicsObjects.platform = {}
---make platform body
-physicsObjects.platform.body = love.physics.newBody(world, love.graphics.getWidth() / 2 , love.graphics.getHeight() - 100, "static");
---make platform shape
-physicsObjects.platform.shape = love.physics.newRectangleShape(300, 50);
---make platform fixture
-physicsObjects.platform.fixture = love.physics.newFixture(physicsObjects.platform.body, physicsObjects.platform.shape, 5);
-physicsObjects.platform.fixture:setCategory(physicsObjects.category.platform);
+physicsObjects.board.fixture:setMask(physicsObjects.category.platform);
 
 physicsObjects.oldTerrain = nil
 

@@ -11,6 +11,10 @@
 -- Mail        : KeaneCarotenuto@gmail.com
 
 --D:\Programs\LOVE
+require "player"
+require "helicopter"
+anim8 = require("libraries/anim8")
+sti = require("libraries/Simple-Tiled-Implementation-master/sti")
 
 local font = love.graphics.newFont(20)
 love.graphics.setFont(font)
@@ -41,7 +45,8 @@ function love.load(arg)
 
     print("Started")
 
-    love.window.setMode(1600, 800, {resizable=true, vsync=false, minwidth=1600, minheight=800})
+    love.window.setMode(1920, 1080, {fullscreen=false, vsync=true})
+    love.window.maximize()
     centerX = love.graphics.getWidth()/2
     centerY = love.graphics.getHeight()/2
     love.graphics.setDefaultFilter("nearest", "nearest")
@@ -57,7 +62,11 @@ function love.load(arg)
     --require the objects
     require("objects")
 
+    Player.board = physicsObjects.board;
+    Player:CreatePlayerAnim(0, 0)
+    Heli:CreateHeliAnim(0, 0)
 
+    Heli.anim.x , Heli.anim.y = Player:GetPos()
 
     -- Create a simple image with a single white pixel to use for the particles.
 	-- We could load an image from the hard drive but this is just an example.
@@ -65,6 +74,8 @@ function love.load(arg)
 	imageData:setPixel(0,0, 1,1,1,1)
 
 	local image = love.graphics.newImage(imageData)
+
+    background = sti("assets/bg_tilemap.lua", 0, 0)
 
 	-- Create and initialize the particle system object.
 	particleSystem = love.graphics.newParticleSystem(image, 1000)
@@ -84,8 +95,10 @@ end
 function love.update(dt)
     --update the physics world
     world:update(dt)
+    --Player.anim.walkGridAnimation:update(dt)
+    Heli.anim.walkGridAnimation:update(dt)
 
-    redBallRot = physicsObjects.redBall.body:getAngle()
+    redBallRot = physicsObjects.board.body:getAngle()
     --convert the angle to degrees
     local degrees = math.deg(redBallRot)
     degrees = math.fmod(degrees, 360)
@@ -97,7 +110,11 @@ function love.update(dt)
     end
     redBallRot = math.rad(degrees)
 
-    redBallX, redBallY = physicsObjects.redBall.body:getPosition()
+    if (math.deg(math.abs(physicsObjects.board.body:getAngle() - Player.lastFlipAngle)) > 360) then
+        Player:AddFlip()
+    end
+
+    redBallX, redBallY = physicsObjects.board.body:getPosition()
     localX = math.cos(redBallRot + math.rad(90)) * -20
     localY = math.sin(redBallRot + math.rad(90)) * -20
     realX = redBallX + localX
@@ -148,28 +165,35 @@ function love.update(dt)
 
     if groundCheckY <= nearestY then
         isGrounded = false
+        Player.anim.walkGridAnimation:gotoFrame(1)
     else
+        if isGrounded == false then
+            if (math.deg(math.abs(physicsObjects.board.body:getAngle() - Player.lastFlipAngle)) > 180) then
+                Player:AddFlip()
+            end
+        end
         isGrounded = true
+        Player.anim.walkGridAnimation:gotoFrame(4)
     end
 
     local moving = false
     --If the A and D keys are pressed, apply torque to the ball to rotate it
     if love.keyboard.isDown("a") then
-        physicsObjects.redBall.body:applyTorque(-100)
+        physicsObjects.board.body:applyTorque(-100)
         moving = true
     end
     if love.keyboard.isDown("d") then
-        physicsObjects.redBall.body:applyTorque(100)
+        physicsObjects.board.body:applyTorque(100)
         moving = true
     end
 
     --if space is pressed, apply an inital impulse to the physicsObjects.redBall, which will make it jump, if it is held down, it will make it jump higher
     if love.keyboard.isDown("space") then
         if isGrounded and not spaceHeld then
-            physicsObjects.redBall.body:applyLinearImpulse(0, -30)
+            physicsObjects.board.body:applyLinearImpulse(0, -30)
         else
-            local mass = physicsObjects.redBall.body:getMass()
-            physicsObjects.redBall.body:applyForce(0, -100 * mass)
+            local mass = physicsObjects.board.body:getMass()
+            physicsObjects.board.body:applyForce(0, -100 * mass)
         end
         
         moving = true
@@ -184,27 +208,27 @@ function love.update(dt)
     end
 
     if not moving then
-        physicsObjects.redBall.body:setAngularVelocity(physicsObjects.redBall.body:getAngularVelocity() - (physicsObjects.redBall.body:getAngularVelocity() * dt * 2))
+        physicsObjects.board.body:setAngularVelocity(physicsObjects.board.body:getAngularVelocity() - (physicsObjects.board.body:getAngularVelocity() * dt * 2))
     end
 
     --apply linear drag to the redBall
-    physicsObjects.redBall.body:applyForce(-physicsObjects.redBall.body:getLinearVelocity() * 0.01, 0)
+    physicsObjects.board.body:applyForce(-physicsObjects.board.body:getLinearVelocity() * 0.01, 0)
 
 
     --cap the speed of the physicsObjects.redBall to 200
-    if physicsObjects.redBall.body:getLinearVelocity() > maxVel then
-        local x, y = physicsObjects.redBall.body:getLinearVelocity()
-        physicsObjects.redBall.body:setLinearVelocity(maxVel, y)
+    if physicsObjects.board.body:getLinearVelocity() > maxVel then
+        local x, y = physicsObjects.board.body:getLinearVelocity()
+        physicsObjects.board.body:setLinearVelocity(maxVel, y)
     end
 
     --cap the rotational speed of the physicsObjects.redBall to 20
-    if physicsObjects.redBall.body:getAngularVelocity() < math.rad(-180) then
-        physicsObjects.redBall.body:setAngularVelocity(math.rad(-180))
+    if physicsObjects.board.body:getAngularVelocity() < math.rad(-180) then
+        physicsObjects.board.body:setAngularVelocity(math.rad(-180))
     end
 
 
     --if the last x position is less than the redBall x position
-    if lastX < physicsObjects.redBall.body:getX() then
+    if lastX < physicsObjects.board.body:getX() then
         --if old terrain exists, destroy it
         if physicsObjects.oldTerrain ~= nil and physicsObjects.oldTerrain.body ~= nil then
             physicsObjects.oldTerrain.body:destroy()
@@ -231,35 +255,55 @@ function love.update(dt)
     particleSystem:moveTo(partX, partY)
     particleSystem:update(dt) -- This performs the simulation of the particles.
 
+    local newHeliX = Lerp(Heli.anim.x, redBallX, dt * 2)
+    local newHeliY = Lerp(Heli.anim.y, redBallY - 400, dt * 2)
+
+    local newHeliAngle =  (newHeliX - Heli.anim.x) / 20
+    Heli.angle = Lerp(Heli.angle, newHeliAngle, dt * 10)
+
+    Heli.anim.x = newHeliX
+    Heli.anim.y = newHeliY
+
     --follow the player with the camera
-    cam:lookAt(physicsObjects.redBall.body:getX(), physicsObjects.redBall.body:getY())
+    cam:lookAt(physicsObjects.board.body:getX(), physicsObjects.board.body:getY())
     --calculate how fast the redBall is moving compared to the maxVel
-    local speed = physicsObjects.redBall.body:getLinearVelocity()
+    local speed = physicsObjects.board.body:getLinearVelocity()
     local speedPercent = speed/maxVel
     --set the camera zoom based on the speed of the redBall
     local newZoom = 1.25 - (speedPercent)/2
     cam:zoomTo(Lerp(cam.scale, newZoom, dt))
+
+    background:update(dt)
     
 end
 
 function love.draw()
+    --make the background light blue
+    love.graphics.setColor(0, 0.0, 0.1)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    
+    love.graphics.setColor(1, 1, 1)
+    local scale = 0.33
+    local width = 128 * 100
+    local nums = math.floor(Player:GetPos() / width)
+
+    love.graphics.scale(scale, scale)
+
+    --draw first background
+    local tx = -math.fmod(Player:GetPos(), width);
+    love.graphics.translate(tx, 0)
+    background:drawLayer(background.layers[1])
+    love.graphics.translate(-tx, 0)
+
+    --draw second background to the right of the first
+    love.graphics.translate(tx + width, 0)
+    background:drawLayer(background.layers[1])
+    love.graphics.translate(-tx -width, 0)
+
+    love.graphics.scale(1/scale, 1/scale)
+
+
     cam:attach()
-
-    --draw the ground green
-    -- love.graphics.setColor(0, 255, 0)
-    -- love.graphics.polygon("fill", physicsObjects.ground.body:getWorldPoints(physicsObjects.ground.shape:getPoints()))
-
-    --draw the platform grey
-    love.graphics.setColor(128, 128, 128)
-    love.graphics.polygon("fill", physicsObjects.platform.body:getWorldPoints(physicsObjects.platform.shape:getPoints()))
-
-    --draw a line from the redBall to the groundCheck point
-    -- love.graphics.setColor(255, 0, 0)
-    -- love.graphics.line(redBallX, redBallY, groundCheckX, groundCheckY)
-
-    --draw the blueBall blue
-    love.graphics.setColor(0, 0, 255)
-    love.graphics.circle("fill", physicsObjects.blueBall.body:getX(), physicsObjects.blueBall.body:getY(), physicsObjects.blueBall.shape:getRadius())
 
     --Store terrain points temporarily
     local terrainPoints = {}
@@ -302,11 +346,17 @@ function love.draw()
 
     --draw the redBall red
     love.graphics.setColor(1, 0, 0)
-    love.graphics.polygon("fill", physicsObjects.redBall.body:getWorldPoints(physicsObjects.redBall.shape:getPoints()))
+    love.graphics.polygon("fill", physicsObjects.board.body:getWorldPoints(physicsObjects.board.shape:getPoints()))
 
-    --draw a blue circle upwards of the redBall
-    love.graphics.setColor(0, 0, 1)
-    love.graphics.circle("fill", realX, realY, 10)
+    love.graphics.setColor(1, 1, 1)
+    local tempX = redBallX + math.cos(redBallRot + math.rad(90)) * -30
+    local tempY = redBallY + math.sin(redBallRot + math.rad(90)) * -30
+    Player.anim.walkGridAnimation:draw(Player.anim.walkSheet, tempX, tempY, redBallRot, 0.2, 0.2, Player.anim.width/2, Player.anim.height/2)
+
+    local tempX = redBallX + math.cos(redBallRot + math.rad(90)) * -90
+    local tempY = redBallY + math.sin(redBallRot + math.rad(90)) * -90
+    Heli.anim.walkGridAnimation:draw(Heli.anim.walkSheet, Heli.anim.x, Heli.anim.y, Heli.angle, 1.0, 1.0, Heli.anim.width/2, Heli.anim.height/2)
+
 
     -- Draw the particle system. Note that we don't need to give the draw()
 	-- function any coordinates here as all individual particles have their
@@ -315,6 +365,13 @@ function love.draw()
 	love.graphics.draw(particleSystem)
 
     cam:detach()
+
+    --draw Player.flips at the top middle of the screen
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setNewFont(50);
+    love.graphics.printf("FLIPS\n" .. Player.flips, 0, 50, 1920, "center")
+    love.graphics.setNewFont(20);
+
 
     --draw the FPS
     love.graphics.setColor(0, 0, 0)
