@@ -1,32 +1,5 @@
 --create a list of physics objects
 physicsObjects = {}
-physicsObjects.category = {redBall = 1, blueBall = 2, platform = 3, ground = 4}
-
--- --initialize empty ground
--- physicsObjects.ground = {}
--- --make ground body
--- physicsObjects.ground.body = love.physics.newBody(world, love.graphics.getWidth()/2, love.graphics.getHeight() - 30, "static");
--- --make ground shape
--- physicsObjects.ground.shape = love.physics.newRectangleShape(love.graphics.getWidth(), 50);
--- --make ground fixture
--- physicsObjects.ground.fixture = love.physics.newFixture(physicsObjects.ground.body, physicsObjects.ground.shape);
--- physicsObjects.ground.fixture:setCategory(physicsObjects.category.ground);
-
---initialize empty red ball
-physicsObjects.board = {}
---make red ball body
-physicsObjects.board.body = love.physics.newBody(world, love.graphics.getWidth() / 2 , love.graphics.getHeight() - 200, "dynamic");
---make red ball shape
-physicsObjects.board.shape = love.physics.newRectangleShape(60, 5);
---make red ball fixture
-physicsObjects.board.fixture = love.physics.newFixture(physicsObjects.board.body, physicsObjects.board.shape, 1);
---make ball bouncy
-physicsObjects.board.fixture:setRestitution(0.0);
---low friction
-physicsObjects.board.fixture:setFriction(0.0);
-physicsObjects.board.fixture:setCategory(physicsObjects.category.redBall);
---red ball doesnt collide with platform
-physicsObjects.board.fixture:setMask(physicsObjects.category.platform);
 
 physicsObjects.oldTerrain = nil
 
@@ -80,13 +53,230 @@ function CreateTerrain(_x, _y)
         end
     end
 
+    --store first point
+    physicsObjects.terrain.firstPointX = terrainPoints[1]
+    physicsObjects.terrain.firstPointY = terrainPoints[2]
+
+    --store last point
+    physicsObjects.terrain.lastPointX = terrainPoints[#terrainPoints-1]
+    physicsObjects.terrain.lastPointY = terrainPoints[#terrainPoints]
+
     --make terrain shape (chain shape)
     physicsObjects.terrain.shape = love.physics.newChainShape(false, terrainPoints);
     --make terrain fixture
     physicsObjects.terrain.fixture = love.physics.newFixture(physicsObjects.terrain.body, physicsObjects.terrain.shape);
-    physicsObjects.terrain.fixture:setCategory(physicsObjects.category.ground);
+
+
+
+    
+
+
+    physicsObjects.terrain.rockPoints = {}
+    physicsObjects.terrain.snowPoints = {}
+    physicsObjects.terrain.consistentSnowPoints = {}
+    --Store terrain points temporarily
+    local tp = {}
+    tp = {physicsObjects.terrain.body:getWorldPoints(physicsObjects.terrain.shape:getPoints())}
+    --for each point in the terrainPoints table
+    for i = 3, #tp, 2 do
+        local depth = 2000
+        local snowHieght = 5
+        local snowThickness = 100
+        local p1x = tp[i-2]
+        local p1y = tp[i-1]
+        local p2x = tp[i]
+        local p2y = tp[i+1]
+
+        local p1ybot = p1y + depth
+        local p2ybot = p2y + depth
+
+        --store rock positions
+        table.insert(physicsObjects.terrain.rockPoints, p1x)
+        table.insert(physicsObjects.terrain.rockPoints, p1y)
+        table.insert(physicsObjects.terrain.rockPoints, p2x)
+        table.insert(physicsObjects.terrain.rockPoints, p2y)
+        table.insert(physicsObjects.terrain.rockPoints, p2ybot)
+        table.insert(physicsObjects.terrain.rockPoints, p1ybot)
+
+        --compare against noise function, to randomly add some snow circles on the surface
+        local noise = love.math.noise(p1x, p1y)
+        local noise2 = love.math.noise(p1x + 10, p1y + 10)
+        if noise > 0.5 then
+            --store snow positions
+            table.insert(physicsObjects.terrain.snowPoints, (p1x + p2x) / 2)
+            table.insert(physicsObjects.terrain.snowPoints, (p1y + p2y)/2 + snowHieght)
+            table.insert(physicsObjects.terrain.snowPoints, noise2 * 20)
+        end
+
+        --draw consistent snow
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.polygon("fill", {p1x, p1y - snowHieght, p2x, p2y - snowHieght, p2x, p2y + snowThickness, p1x, p1y + snowThickness})
+
+        --store consistent snow positions
+        table.insert(physicsObjects.terrain.consistentSnowPoints, p1x)
+        table.insert(physicsObjects.terrain.consistentSnowPoints, p1y - snowHieght)
+        table.insert(physicsObjects.terrain.consistentSnowPoints, p2x)
+        table.insert(physicsObjects.terrain.consistentSnowPoints, p2y - snowHieght)
+        table.insert(physicsObjects.terrain.consistentSnowPoints, p2y + snowThickness)
+        table.insert(physicsObjects.terrain.consistentSnowPoints, p1y + snowThickness)
+    end
+
+
+
+    
+    --insert draw function
+    function physicsObjects.terrain:Draw()
+        cam:attach()
+
+        --get the min and max screen coords
+        local minX = Player:GetPos() - (love.graphics.getWidth() / 2 + 100) / cam.scale
+        local maxX = Player:GetPos() + (love.graphics.getWidth() / 2 + 100) / cam.scale
+
+        --draw terrain rock
+        love.graphics.setColor(0.5, 0.5, 0.5)
+        for i = 1, #self.rockPoints, 3*2 do
+
+            local p1x = self.rockPoints[i]
+            local p1y = self.rockPoints[i+1]
+            local p2x = self.rockPoints[i+2]
+            local p2y = self.rockPoints[i+3]
+            local p2ybot = self.rockPoints[i+4]
+            local p1ybot = self.rockPoints[i+5]
+
+            --check if p1x or p2x is outside of the screen
+            if p1x < minX or p2x < minX then
+                --do nothing
+            elseif p1x > maxX or p2x > maxX then
+                break
+            else
+                --draw terrain rock
+                love.graphics.polygon("fill", {p1x, p1y, p2x, p2y, p2x, p2ybot, p1x, p1ybot})
+            end
+        end
+
+        --draw terrain snow
+        love.graphics.setColor(0.9, 0.9, 0.9)
+        for i = 1, #self.snowPoints, 3 do
+            local x = self.snowPoints[i]
+            local y = self.snowPoints[i+1]
+            local r = self.snowPoints[i+2]
+
+            --check if p1x or p2x is outside of the screen
+            if x < minX then
+                --do nothing
+            elseif x > maxX then
+                break
+            else
+                --draw terrain snow
+                love.graphics.circle("fill", x, y, r)
+            end
+        end
+
+        local light = true
+        --draw terrain consistent snow
+        for i = 1, #self.consistentSnowPoints, 3*2 do
+            local p1x = self.consistentSnowPoints[i]
+            local p1yH = self.consistentSnowPoints[i+1]
+            local p2x = self.consistentSnowPoints[i+2]
+            local p2yH = self.consistentSnowPoints[i+3]
+            local p2yT = self.consistentSnowPoints[i+4]
+            local p1yT = self.consistentSnowPoints[i+5]
+
+            --alernate between light and dark snow
+            if light then
+                love.graphics.setColor(1, 1, 1)
+                light = false
+            else
+                love.graphics.setColor(0.95, 0.95, 0.95)
+                light = true
+            end
+
+            --check if p1x or p2x is outside of the screen
+            if p1x < minX or p2x < minX then
+                --do nothing
+            elseif p1x > maxX or p2x > maxX then
+                break
+            else
+                --draw terrain consistent snow
+                love.graphics.polygon("fill", {p1x, p1yH, p2x, p2yH, p2x, p2yT, p1x, p1yT})
+            end
+        end
+
+        local lastX, lastY = self:GetFirstPoint()
+        lastX = lastX + self.body:getX()
+        lastY = lastY + self.body:getY()
+        --draw a black line with a white triangle at the top of it, at the start of the terrain
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.polygon("fill", lastX, lastY, lastX + 5, lastY, lastX + 5, lastY - 100, lastX, lastY - 90)
+        love.graphics.setColor(1, 0, 0)
+        love.graphics.polygon("fill", lastX, lastY - 100, lastX, lastY - 70, lastX + 40, lastY - 85)
+
+        cam:detach()
+    end
+
+    --insert GetLastPoint function
+    function physicsObjects.terrain:GetLastPoint()
+        return self.lastPointX, self.lastPointY
+    end
+
+    --insert Get first point function
+    function physicsObjects.terrain:GetFirstPoint()
+        return self.firstPointX, self.firstPointY
+    end
+
+    --insert GetNearest function
+    function physicsObjects.terrain:GetNearest(x, y)
+        local tp = {self.body:getWorldPoints(self.shape:getPoints())}
+        local nearestX = tp[1]
+        local nearestY = tp[2]
+
+        --Find the nearest terrain point that the ball is on
+        for i = 3, #tp, 2 do
+            if tp[i] > x then
+                local prevX = tp[i-2]
+                local prevY = tp[i-1]
+                
+                local nextX = tp[i]
+                local nextY = tp[i+1]
+
+                local lerpVal = (x - prevX)/(nextX - prevX)
+
+                --if lerpVal is not between 0 and 1, then do nothing
+                if lerpVal < 0 or lerpVal > 1 then
+
+                else 
+                    nearestX = Lerp(prevX, nextX, (x - prevX)/(nextX - prevX))
+                    nearestY = Lerp(prevY, nextY, (x - prevX)/(nextX - prevX))
+                end
+                break
+            end
+        end
+
+        return nearestX, nearestY
+    end
+
 end
 
-CreateTerrain(0,0)
+function GetNearest(x, y)
+    --check which terrain the x and y are on
+    local newFirstX = physicsObjects.terrain:GetFirstPoint()
+    if x > newFirstX then
+        return physicsObjects.terrain:GetNearest(x, y)
+    else
+        if physicsObjects.oldTerrain then
+            return physicsObjects.oldTerrain:GetNearest(x, y)
+        end
+        return x, y
+    end
+end
+
+function ResetTerrain()
+    physicsObjects.terrain.body:destroy()
+    if physicsObjects.oldTerrain ~= nil and physicsObjects.oldTerrain ~= {} then physicsObjects.oldTerrain.body:destroy() end
+    physicsObjects.terrain = nil
+    physicsObjects.oldTerrain = nil
+
+    CreateTerrain(0,0)
+end
 
 return physicsObjects
