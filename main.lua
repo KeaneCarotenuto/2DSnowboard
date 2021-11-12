@@ -55,6 +55,8 @@ function love.load(arg)
     love.physics.setMeter(64)
     --make the physics world
     world = love.physics.newWorld(0, 9.81*64, true)
+    --set collision callbacks
+    world:setCallbacks(BeginContact)
     
     CreateTerrain(0,0)
 
@@ -167,6 +169,28 @@ function FadeEnded()
     end
 end
 
+function BeginContact(a, b, coll)
+    if (a:getUserData() == nil or b:getUserData() == nil) then
+        return
+    end
+
+    local x,y = coll:getNormal()
+    local text = "\n".. a:getUserData() .. " colliding with " .. b:getUserData().. " with a vector normal of: " .. x .. ", " ..y
+    print(text)
+
+    --check if board and terrain collide
+    if (a:getUserData() == "board" or a:getUserData() == "terrain") and (b:getUserData() == "terrain" or b:getUserData() == "board") then
+        --check if player is grounded
+        if Player.giveBoost then
+            --apply right impulse to player
+            Player.board.body:applyLinearImpulse(Player.rightX * 100, Player.rightY * 100)
+            Player.maxVel = Player.maxVel + 25
+            Player.giveBoost = false
+        end
+    end
+        
+end
+
 function UpdateGame(dt)
     --update the physics world
     world:update(dt)
@@ -216,6 +240,7 @@ function UpdateGame(dt)
         cam:lookAt(newX, newY)
 
         local newZoom = Lerp(cam.scale, 0.5, dt / 3)
+        newZoom = Clamp(newZoom, 0.5, 1.5)
         cam:zoomTo(newZoom)
     end
 

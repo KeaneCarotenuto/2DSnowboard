@@ -26,6 +26,7 @@ Player = {
     rightY = 0,
     isGrounded = false,
     firstGround = false,
+    giveBoost = false,
     spaceHeld = false,
     alive = true,
 
@@ -58,7 +59,8 @@ function Player:Update(dt)
 
     if self.alive then
         if (math.deg(math.abs(self.board.body:getAngle() - self.lastFlipAngle)) > 360) then
-            Player:AddFlip()
+            self:AddFlip()
+            self.giveBoost = true
         end
     
         local nearestX , nearestY = GetNearest(self.x, self.y)
@@ -391,6 +393,8 @@ function Player:CreateBoard()
     --low friction
     physicsObjects.board.fixture:setFriction(0.0);
 
+    physicsObjects.board.fixture:setUserData("board")
+
     self.board = physicsObjects.board;
 
     --create snow sound
@@ -401,7 +405,7 @@ function Player:CreateBoard()
     --create death sound
     self.deathSound = love.audio.newSource("assets/death.wav", "static")
     self.deathSound:setLooping(false)
-    self.deathSound:setVolume(0.5)
+    self.deathSound:setVolume(0.2)
 end
 
 function Player:CreateParticles()
@@ -442,6 +446,7 @@ function Player:CreatePlayerAnim(x,y)
   function Player:Reset()
     self.alive = true
     self.flips = 0
+    self.maxVel = 800
     self.totalRotation = 0
     self.currentAngle = 0
     self.lastFlipAngle = 0

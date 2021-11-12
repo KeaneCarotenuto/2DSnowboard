@@ -66,6 +66,8 @@ function CreateTerrain(_x, _y)
     --make terrain fixture
     physicsObjects.terrain.fixture = love.physics.newFixture(physicsObjects.terrain.body, physicsObjects.terrain.shape);
 
+    physicsObjects.terrain.fixture:setUserData("terrain")
+
 
 
     
