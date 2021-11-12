@@ -12,7 +12,7 @@ function Heli:CreateHeliAnim(x,y)
     animation.width = 1800/6
     animation.height = 144
     animation.walkGrid = anim8.newGrid(animation.width, animation.height, animation.imageDimension[1], animation.imageDimension[2])
-    animation.walkGridAnimation = anim8.newAnimation(animation.walkGrid('1-6', 1), 0.05)
+    animation.walkGridAnimation = anim8.newAnimation(animation.walkGrid('1-6', 1), 0.01)
   
     Heli.anim = animation
 end

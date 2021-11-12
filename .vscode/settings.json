@@ -13,6 +13,7 @@
         "cam",
         "anim8",
         "sti",
-        "background"
+        "background",
+        "bgImage"
     ]
 }

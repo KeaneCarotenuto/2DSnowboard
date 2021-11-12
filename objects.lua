@@ -129,8 +129,8 @@ function CreateTerrain(_x, _y)
         cam:attach()
 
         --get the min and max screen coords
-        local minX = Player:GetPos() - (love.graphics.getWidth() / 2 + 100) / cam.scale
-        local maxX = Player:GetPos() + (love.graphics.getWidth() / 2 + 100) / cam.scale
+        local minX = cam.x - (love.graphics.getWidth() / 2 + 100) / cam.scale
+        local maxX = cam.x + (love.graphics.getWidth() / 2 + 100) / cam.scale
 
         --draw terrain rock
         love.graphics.setColor(0.5, 0.5, 0.5)

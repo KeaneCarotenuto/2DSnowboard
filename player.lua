@@ -8,7 +8,10 @@
 Player = {
     board = nil,
     bodyParts = {},
+    snowSound = nil,
+    deathSound = nil,
     anim = nil,
+    jumpImage = nil,
     particles = nil,
     lastFlipAngle = 0,
     flips = 0,
@@ -22,6 +25,7 @@ Player = {
     rightX = 1,
     rightY = 0,
     isGrounded = false,
+    firstGround = false,
     spaceHeld = false,
     alive = true,
 
@@ -68,7 +72,10 @@ function Player:Update(dt)
     
         if groundCheckY <= nearestY then
             self.isGrounded = false
-            self.anim.walkGridAnimation:gotoFrame(1)
+            --lerp volume to 0
+            if self.snowSound:getVolume() > 0 then
+                self.snowSound:setVolume(Lerp(self.snowSound:getVolume(), 0, dt * 10))
+            end
         else
             if self.isGrounded == false then
                 if (math.deg(math.abs(self.board.body:getAngle() - self.lastFlipAngle)) > 180) then
@@ -76,7 +83,16 @@ function Player:Update(dt)
                 end
             end
             self.isGrounded = true
-            self.anim.walkGridAnimation:gotoFrame(4)
+            --lerp volume to 1
+            if self.snowSound:getVolume() < 1 then
+                self.snowSound:setVolume(Lerp(self.snowSound:getVolume(), 1, dt * 10))
+            end
+
+            if self.firstGround == false then
+                self.firstGround = true
+                --add x velocity to player
+                self.board.body:applyLinearImpulse(self.rightX * 100, self.rightY * 100)
+            end
         end
     
         if personCheckY >= nearestY then
@@ -134,6 +150,7 @@ function Player:Update(dt)
     
         if self.isGrounded then
             self.particles:start()
+            self.anim.walkGridAnimation:update(dt)
         else
             self.particles:pause()
         end
@@ -142,9 +159,6 @@ function Player:Update(dt)
 
         --apply linear drag to the redBall
         --self.board.body:applyForce(-self.board.body:getLinearVelocity() * 0.1, 0)
-
-        --set the friction of the body to 1
-        self.board.fixture:setFriction(0.8);
     end
     
 
@@ -159,7 +173,7 @@ function Player:Draw()
     cam:attach()
 
     love.graphics.setColor(0, 0, 0)
-    love.graphics.polygon("fill", self.board.body:getWorldPoints(self.board.shape:getPoints()))
+    if not self.alive then love.graphics.polygon("fill", self.board.body:getWorldPoints(self.board.shape:getPoints())) end
 
     -- Draw the particle system. Note that we don't need to give the draw()
 	-- function any coordinates here as all individual particles have their
@@ -170,32 +184,38 @@ function Player:Draw()
     --if player is dead, draw the body parts
     if not self.alive then
         --draw circel head
-        love.graphics.setColor(1, 0, 0)
+        love.graphics.setColor(213/256, 178/256, 155/256)
         love.graphics.circle("fill", self.bodyParts.head.body:getX(), self.bodyParts.head.body:getY(), self.bodyParts.head.shape:getRadius())
 
         --draw rectangle body
-        love.graphics.setColor(1, 0, 0)
+        love.graphics.setColor(73/256, 90/256, 72/256)
         love.graphics.polygon("fill", self.bodyParts.body.body:getWorldPoints(self.bodyParts.body.shape:getPoints()))
 
         --draw rectangle left arm
-        love.graphics.setColor(1, 0, 0)
+        love.graphics.setColor(213/256, 178/256, 155/256)
         love.graphics.polygon("fill", self.bodyParts.leftArm.body:getWorldPoints(self.bodyParts.leftArm.shape:getPoints()))
 
         --draw rectangle right arm
-        love.graphics.setColor(1, 0, 0)
+        love.graphics.setColor(213/256, 178/256, 155/256)
         love.graphics.polygon("fill", self.bodyParts.rightArm.body:getWorldPoints(self.bodyParts.rightArm.shape:getPoints()))
 
         --draw rectangle left leg
-        love.graphics.setColor(1, 0, 0)
+        love.graphics.setColor(35/256, 35/256, 44/256)
         love.graphics.polygon("fill", self.bodyParts.leftLeg.body:getWorldPoints(self.bodyParts.leftLeg.shape:getPoints()))
 
         --draw rectangle right leg
-        love.graphics.setColor(1, 0, 0)
+        love.graphics.setColor(35/256, 35/256, 44/256)
         love.graphics.polygon("fill", self.bodyParts.rightLeg.body:getWorldPoints(self.bodyParts.rightLeg.shape:getPoints()))
 
     else
         love.graphics.setColor(1, 1, 1)
-        self.anim.walkGridAnimation:draw(self.anim.walkSheet, self.x + self.upX * 30, self.y + self.upY * 30, self.totalRotation, 0.2, 0.2, self.anim.width/2, self.anim.height/2)
+        if self.isGrounded then
+            self.anim.walkGridAnimation:draw(self.anim.walkSheet, self.x + self.upX * 32, self.y + self.upY * 32, self.totalRotation, 2.5, 2.5, self.anim.width/2, self.anim.height/2)
+        else
+            love.graphics.draw(self.jumpImage, self.x + self.upX * 32, self.y + self.upY * 32, self.totalRotation, 2.5, 2.5, self.anim.width/2, self.anim.height/2)
+        end
+        
+        
     end
 
     cam:detach()
@@ -203,6 +223,14 @@ end
 
 function Player:Die()
     self.alive = false
+
+    --set the friction of the body to 1
+    self.board.fixture:setFriction(0.8);
+
+    self.deathSound:play()
+
+    StartFade(0.33)
+    NextScene = Scenes.gameOver
 
     --empty the list
     self.bodyParts = {}
@@ -213,7 +241,7 @@ function Player:Die()
     --make head body
     self.bodyParts.head.body = love.physics.newBody(world, self.x , self.y - 50, "dynamic");
     --make head shape
-    self.bodyParts.head.shape = love.physics.newCircleShape(10);
+    self.bodyParts.head.shape = love.physics.newCircleShape(5);
     --make head fixture
     self.bodyParts.head.fixture = love.physics.newFixture(self.bodyParts.head.body, self.bodyParts.head.shape, 1);
     --set friction
@@ -224,7 +252,7 @@ function Player:Die()
     --make body body
     self.bodyParts.body.body = love.physics.newBody(world, self.x , self.y - 30, "dynamic");
     --make body shape
-    self.bodyParts.body.shape = love.physics.newRectangleShape(20, 40);
+    self.bodyParts.body.shape = love.physics.newRectangleShape(10, 20);
     --make body fixture
     self.bodyParts.body.fixture = love.physics.newFixture(self.bodyParts.body.body, self.bodyParts.body.shape, 1);
     --set friction
@@ -235,7 +263,7 @@ function Player:Die()
     --make left arm body
     self.bodyParts.leftArm.body = love.physics.newBody(world, self.x - 20 , self.y - 30, "dynamic");
     --make left arm shape
-    self.bodyParts.leftArm.shape = love.physics.newRectangleShape(40, 10);
+    self.bodyParts.leftArm.shape = love.physics.newRectangleShape(20, 5);
     --make left arm fixture
     self.bodyParts.leftArm.fixture = love.physics.newFixture(self.bodyParts.leftArm.body, self.bodyParts.leftArm.shape, 1);
     --set friction
@@ -246,7 +274,7 @@ function Player:Die()
     --make right arm body
     self.bodyParts.rightArm.body = love.physics.newBody(world, self.x + 20 , self.y - 30, "dynamic");
     --make right arm shape
-    self.bodyParts.rightArm.shape = love.physics.newRectangleShape(40, 10);
+    self.bodyParts.rightArm.shape = love.physics.newRectangleShape(20, 5);
     --make right arm fixture
     self.bodyParts.rightArm.fixture = love.physics.newFixture(self.bodyParts.rightArm.body, self.bodyParts.rightArm.shape, 1);
     --set friction
@@ -257,7 +285,7 @@ function Player:Die()
     --make left leg body
     self.bodyParts.leftLeg.body = love.physics.newBody(world, self.x - 10, self.y, "dynamic");
     --make left leg shape
-    self.bodyParts.leftLeg.shape = love.physics.newRectangleShape(15, 50);
+    self.bodyParts.leftLeg.shape = love.physics.newRectangleShape(8, 25);
     --make left leg fixture
     self.bodyParts.leftLeg.fixture = love.physics.newFixture(self.bodyParts.leftLeg.body, self.bodyParts.leftLeg.shape, 1);
     --set friction
@@ -268,12 +296,20 @@ function Player:Die()
     --make right leg body
     self.bodyParts.rightLeg.body = love.physics.newBody(world, self.x + 15 , self.y, "dynamic");
     --make right leg shape
-    self.bodyParts.rightLeg.shape = love.physics.newRectangleShape(15, 50);
+    self.bodyParts.rightLeg.shape = love.physics.newRectangleShape(8, 25);
     --make right leg fixture
     self.bodyParts.rightLeg.fixture = love.physics.newFixture(self.bodyParts.rightLeg.body, self.bodyParts.rightLeg.shape, 1);
     --set friction
     self.bodyParts.rightLeg.fixture:setFriction(0.8);
 
+
+    --set the velocity of the body parts to the velocity of the board
+    self.bodyParts.head.body:setLinearVelocity(self.board.body:getLinearVelocity())
+    self.bodyParts.body.body:setLinearVelocity(self.board.body:getLinearVelocity())
+    self.bodyParts.leftArm.body:setLinearVelocity(self.board.body:getLinearVelocity())
+    self.bodyParts.rightArm.body:setLinearVelocity(self.board.body:getLinearVelocity())
+    self.bodyParts.leftLeg.body:setLinearVelocity(self.board.body:getLinearVelocity())
+    self.bodyParts.rightLeg.body:setLinearVelocity(self.board.body:getLinearVelocity())
 
 
 end
@@ -347,7 +383,7 @@ function Player:CreateBoard()
     --make red ball body
     physicsObjects.board.body = love.physics.newBody(world, love.graphics.getWidth() / 2 , love.graphics.getHeight() - 200, "dynamic");
     --make red ball shape
-    physicsObjects.board.shape = love.physics.newRectangleShape(60, 5);
+    physicsObjects.board.shape = love.physics.newRectangleShape(45, 5);
     --make red ball fixture
     physicsObjects.board.fixture = love.physics.newFixture(physicsObjects.board.body, physicsObjects.board.shape, 1);
     --make ball bouncy
@@ -356,6 +392,16 @@ function Player:CreateBoard()
     physicsObjects.board.fixture:setFriction(0.0);
 
     self.board = physicsObjects.board;
+
+    --create snow sound
+    self.snowSound = love.audio.newSource("assets/snow.wav", "static")
+    self.snowSound:setLooping(true)
+    self.snowSound:setVolume(0.5)
+
+    --create death sound
+    self.deathSound = love.audio.newSource("assets/death.wav", "static")
+    self.deathSound:setLooping(false)
+    self.deathSound:setVolume(0.5)
 end
 
 function Player:CreateParticles()
@@ -381,26 +427,37 @@ function Player:CreatePlayerAnim(x,y)
     local animation = {}
     animation.x = x
     animation.y = y
-    animation.walkSheet = love.graphics.newImage('assets/walk2.png')
+    animation.walkSheet = love.graphics.newImage('assets/snowboarder_spritesheet.png')
     animation.imageDimension = {animation.walkSheet:getDimensions()}
-    animation.width = 1472/8
-    animation.height = 325
+    animation.width = 256/8
+    animation.height = 32
     animation.walkGrid = anim8.newGrid(animation.width, animation.height, animation.imageDimension[1], animation.imageDimension[2])
-    animation.walkGridAnimation = anim8.newAnimation(animation.walkGrid('1-8', 1), 0.10)
+    animation.walkGridAnimation = anim8.newAnimation(animation.walkGrid('1-8', 1), 0.30)
   
     self.anim = animation
+
+    self.jumpImage = love.graphics.newImage('assets/snowboarder_jump.png')
   end
 
   function Player:Reset()
     self.alive = true
+    self.flips = 0
+    self.totalRotation = 0
+    self.currentAngle = 0
+    self.lastFlipAngle = 0
+    self.firstGround = false
     --destroy old body parts
     for k, v in pairs(self.bodyParts) do
         v.body:destroy()
     end
+    self.bodyParts = {}
+
     self:SetPos(love.graphics.getWidth() / 2, love.graphics.getHeight() - 200)
     self.board.body:setLinearVelocity(0, 0)
     self.board.body:setAngularVelocity(0)
     self.board.body:setAngle(0)
+    --set the friction of the body to 0
+    self.board.fixture:setFriction(0.0);
   end
 
 return Player
