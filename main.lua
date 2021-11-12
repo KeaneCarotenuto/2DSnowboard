@@ -9,12 +9,10 @@
 -- Description : The main file resposnible for the game logic
 -- Author      : Keane Carotenuto
 -- Mail        : KeaneCarotenuto@gmail.com
-
---https://www.gameart2d.com/winter-platformer-game-tileset.html
-
-require "player"
-require "helicopter"
-require "objects"
+require "scripts/player"
+require "scripts/helicopter"
+require "scripts/objects"
+require "scripts/decor"
 
 camera = require("libraries/camera")
 anim8 = require("libraries/anim8")
@@ -35,6 +33,7 @@ NextScene = Scenes.menu
 Fade = 1
 FadeSpeed = -1
 
+-- Loads the game
 function love.load(arg)
     math.randomseed(os.time())
 
@@ -79,11 +78,12 @@ function love.load(arg)
     music:play()
 
     --create and start heli sound
-    heliSound = love.audio.newSource("assets/heli.wav", "static")
-    heliSound:setLooping(true)
-    heliSound:setVolume(0.15)
+    Heli.sound = love.audio.newSource("assets/heli.wav", "static")
+    Heli.sound:setLooping(true)
+    Heli.sound:setVolume(0.15)
 end
 
+-- Key callback
 function love.keypressed(key, scancode, isrepeat)
     if CurrentScene == Scenes.menu then
         if key == "space" then
@@ -121,6 +121,7 @@ function love.keypressed(key, scancode, isrepeat)
     end
 end
 
+-- Main update
 function love.update(dt)
     --switch case for current scene
     if CurrentScene == Scenes.menu then
@@ -146,16 +147,18 @@ function love.update(dt)
     end
 end
 
+--start fade in direction + to make black, - to make transparent
 function StartFade(speed)
     FadeSpeed = speed
 end
 
+--when fade is fully black
 function FadeEnded()
     --switch case for next scene
     if NextScene == Scenes.menu then
         CurrentScene = Scenes.menu
         Player.snowSound:stop()
-        heliSound:stop()
+        Heli.sound:stop()
         StartFade(-1)
     elseif NextScene == Scenes.game then
         CurrentScene = Scenes.game
@@ -165,68 +168,47 @@ function FadeEnded()
         CurrentScene = Scenes.gameOver
         StartFade(-1)
         Player.snowSound:stop()
-        heliSound:stop()
+        Heli.sound:stop()
     end
 end
 
+--Collision callback
 function BeginContact(a, b, coll)
     if (a:getUserData() == nil or b:getUserData() == nil) then
         return
     end
 
-    local x,y = coll:getNormal()
-    local text = "\n".. a:getUserData() .. " colliding with " .. b:getUserData().. " with a vector normal of: " .. x .. ", " ..y
-    print(text)
-
     --check if board and terrain collide
     if (a:getUserData() == "board" or a:getUserData() == "terrain") and (b:getUserData() == "terrain" or b:getUserData() == "board") then
-        --check if player is grounded
-        if Player.giveBoost then
-            --apply right impulse to player
-            Player.board.body:applyLinearImpulse(Player.rightX * 100, Player.rightY * 100)
-            Player.maxVel = Player.maxVel + 25
-            Player.giveBoost = false
-        end
+        Player:GroundCollision(a,b,coll)
     end
-        
 end
 
+--Update game logic
 function UpdateGame(dt)
     --update the physics world
     world:update(dt)
 
-    local newHeliX = Lerp(Heli.anim.x, Player.x, dt * 2)
-    local newHeliY = Lerp(Heli.anim.y, Player.y - 400, dt * 2)
-    local newHeliAngle =  (newHeliX - Heli.anim.x) / 20
-    newHeliAngle = Clamp(newHeliAngle, Heli.angle - 1, Heli.angle + 1)
-    Heli.angle = Lerp(Heli.angle, newHeliAngle, dt * 10)
-    Heli.anim.x = newHeliX
-    Heli.anim.y = newHeliY
-    Heli.anim.walkGridAnimation:update(dt)
+    --update the heli
+    Heli:Update(dt)
 
     --update player
     Player:Update(dt)
 
-    --update the sound of the helicopter based on the distance to camera
-    local distance = math.sqrt((Heli.anim.x - cam.x)^2 + (Heli.anim.y - cam.y)^2)
-    heliSound:setVolume(Clamp((1000 / distance) / 5, 0.0, 0.15))
+    UpdateDecor(dt)
 
-    --generate new terrain if the player is near the edge of the screen
-    if physicsObjects.terrain.lastPointX < Player.board.body:getX() + love.graphics.getWidth() then
-        --if old terrain exists, destroy it
-        if physicsObjects.oldTerrain ~= nil and physicsObjects.oldTerrain.body ~= nil then
-            physicsObjects.oldTerrain.body:destroy()
-        end
+    TerrainUpdate(dt)
 
-        physicsObjects.oldTerrain = physicsObjects.terrain
+    CamUpdate(dt)
 
-        --create a new terrain
-        CreateTerrain(physicsObjects.terrain.lastPointX, physicsObjects.terrain.lastPointY)
-    end
+    background:update(dt)
+end
 
+function CamUpdate(dt)
     --follow the player with the camera
     if Player.alive then
-        cam:lookAt(Player.board.body:getX(), Player.board.body:getY())
+        local lerpAmount = Clamp(dt * 20, 0, 1)
+        cam:lookAt(Player.x, Player.y)
 
         --calculate how fast the player is moving compared to the maxVel
         local speed = Player.board.body:getLinearVelocity()
@@ -235,16 +217,14 @@ function UpdateGame(dt)
         local newZoom = 1.25 - (speedPercent)/2
         cam:zoomTo(Lerp(cam.scale, newZoom, dt))
     else
-        local newX = Lerp(cam.x, Heli.anim.x, dt / 3)
-        local newY = Lerp(cam.y, Heli.anim.y, dt / 3)
+        local newX = Lerp(cam.x, Player.bodyParts.head.body:getX(), dt * 5)
+        local newY = Lerp(cam.y, Player.bodyParts.head.body:getY(), dt * 5)
         cam:lookAt(newX, newY)
 
-        local newZoom = Lerp(cam.scale, 0.5, dt / 3)
+        local newZoom = Lerp(cam.scale, 1.5, dt / 3)
         newZoom = Clamp(newZoom, 0.5, 1.5)
         cam:zoomTo(newZoom)
     end
-
-    background:update(dt)
 end
 
 function love.draw()
@@ -284,10 +264,12 @@ function DrawGame()
         physicsObjects.oldTerrain:Draw()
     end
 
-    cam:attach()
-    love.graphics.setColor(1, 1, 1)
-    Heli.anim.walkGridAnimation:draw(Heli.anim.walkSheet, Heli.anim.x, Heli.anim.y, Heli.angle, 1.0, 1.0, Heli.anim.width/2, Heli.anim.height/2)
-    cam:detach()
+    --draw all decor
+    for i,v in ipairs(decorList) do
+        v:Draw()
+    end
+
+    Heli:Draw()
 
     Player:Draw()
     
@@ -335,7 +317,7 @@ function DrawBackground()
     local scale = 0.33
     local width = 128 * 100
 
-    love.graphics.scale(scale, scale)
+    love.graphics.scale(scale, scale * 1.3)
 
     --draw first background
     local tx = -math.fmod(Player:GetPos(), width);
@@ -348,7 +330,7 @@ function DrawBackground()
     background:drawLayer(background.layers[1])
     love.graphics.translate(-tx -width, 0)
 
-    love.graphics.scale(1/scale, 1/scale)
+    love.graphics.scale(1/scale, 1/(scale*1.3))
 end
 
 function DrawGameUI()
@@ -371,12 +353,20 @@ function Reset()
     Heli:Reset(Player:GetPos())
     ResetTerrain()
 
+    --delete all decor
+    for i,v in ipairs(decorList) do
+        if (v ~= nil) then
+            v:Delete()
+        end
+    end
+    decorList = {}
+
     Player.snowSound:play()
-    heliSound:play()
+    Heli.sound:play()
 end
 
 function Lerp(a, b, t)
-	return a + (b - a) * t
+	return a + (b - a) * Clamp(t,0,1)
 end
 
 function Clamp(min, val, max)

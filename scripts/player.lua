@@ -1,9 +1,14 @@
---player class for the game
-
---player class to store player data and functions for the game
---Store x and y position of the player
---Store the player's health
---Store the player's score
+-- Bachelor of Software Engineering
+-- Media Design School
+-- Auckland
+-- New Zealand
+--
+-- (c) 2021 Media Design School
+--
+-- File Name   : player.lua
+-- Description : Stores all player reevant data and functions
+-- Author      : Keane Carotenuto
+-- Mail        : KeaneCarotenuto@gmail.com
 
 Player = {
     board = nil,
@@ -81,7 +86,8 @@ function Player:Update(dt)
         else
             if self.isGrounded == false then
                 if (math.deg(math.abs(self.board.body:getAngle() - self.lastFlipAngle)) > 180) then
-                    Player:AddFlip()
+                    Player:AddFlip()    
+                    self.giveBoost = true
                 end
             end
             self.isGrounded = true
@@ -223,6 +229,16 @@ function Player:Draw()
     cam:detach()
 end
 
+function Player:GroundCollision(a,b,coll)
+    --check if player is grounded
+    if Player.giveBoost then
+        --apply right impulse to player
+        Player.board.body:applyLinearImpulse(Player.rightX * 20, Player.rightY * 20)
+        Player.maxVel = Player.maxVel + 25
+        Player.giveBoost = false
+    end
+end
+
 function Player:Die()
     self.alive = false
 
@@ -231,7 +247,7 @@ function Player:Die()
 
     self.deathSound:play()
 
-    StartFade(0.33)
+    StartFade(0.2)
     NextScene = Scenes.gameOver
 
     --empty the list
@@ -296,13 +312,42 @@ function Player:Die()
     --make right leg
     self.bodyParts.rightLeg = {}
     --make right leg body
-    self.bodyParts.rightLeg.body = love.physics.newBody(world, self.x + 15 , self.y, "dynamic");
+    self.bodyParts.rightLeg.body = love.physics.newBody(world, self.x + 10 , self.y, "dynamic");
     --make right leg shape
     self.bodyParts.rightLeg.shape = love.physics.newRectangleShape(8, 25);
     --make right leg fixture
     self.bodyParts.rightLeg.fixture = love.physics.newFixture(self.bodyParts.rightLeg.body, self.bodyParts.rightLeg.shape, 1);
     --set friction
     self.bodyParts.rightLeg.fixture:setFriction(0.8);
+
+    --attach the body parts togtether
+    --head to body
+    local jointHB = love.physics.newRevoluteJoint(self.bodyParts.body.body, self.bodyParts.head.body, self.x, self.y - 30 - 10, self.x, self.y - 45, false)
+    --body to left arm
+    local jointBA = love.physics.newRevoluteJoint(self.bodyParts.body.body, self.bodyParts.leftArm.body, self.x - 5, self.y - 40, self.x - 20 + 10, self.y - 30, false)
+    --body to right arm
+    local jointBA = love.physics.newRevoluteJoint(self.bodyParts.body.body, self.bodyParts.rightArm.body, self.x + 5, self.y - 40, self.x + 20 - 10, self.y - 30, false)
+    --body to left leg
+    local jointBL = love.physics.newRevoluteJoint(self.bodyParts.body.body, self.bodyParts.leftLeg.body, self.x - 5, self.y - 30 + 10, self.x - 10, self.y - 10, false)
+    --body to right leg
+    local jointBR = love.physics.newRevoluteJoint(self.bodyParts.body.body, self.bodyParts.rightLeg.body, self.x + 5, self.y - 30 + 10, self.x + 10, self.y - 10, false)
+
+
+    --set category
+    self.bodyParts.head.fixture:setCategory(physicsObjects.category.bodyParts)
+    self.bodyParts.body.fixture:setCategory(physicsObjects.category.bodyParts)
+    self.bodyParts.leftArm.fixture:setCategory(physicsObjects.category.bodyParts)
+    self.bodyParts.rightArm.fixture:setCategory(physicsObjects.category.bodyParts)
+    self.bodyParts.leftLeg.fixture:setCategory(physicsObjects.category.bodyParts)
+    self.bodyParts.rightLeg.fixture:setCategory(physicsObjects.category.bodyParts)
+    --set mask
+    self.bodyParts.head.fixture:setMask(physicsObjects.category.bodyParts)
+    self.bodyParts.body.fixture:setMask(physicsObjects.category.bodyParts)
+    self.bodyParts.leftArm.fixture:setMask(physicsObjects.category.bodyParts)
+    self.bodyParts.rightArm.fixture:setMask(physicsObjects.category.bodyParts)
+    self.bodyParts.leftLeg.fixture:setMask(physicsObjects.category.bodyParts)
+    self.bodyParts.rightLeg.fixture:setMask(physicsObjects.category.bodyParts)
+
 
 
     --set the velocity of the body parts to the velocity of the board
@@ -395,6 +440,11 @@ function Player:CreateBoard()
 
     physicsObjects.board.fixture:setUserData("board")
 
+    --set board category
+    physicsObjects.board.fixture:setCategory(physicsObjects.category.board)
+    --set board mask
+    physicsObjects.board.fixture:setMask(physicsObjects.category.bodyParts)
+
     self.board = physicsObjects.board;
 
     --create snow sound
@@ -405,7 +455,7 @@ function Player:CreateBoard()
     --create death sound
     self.deathSound = love.audio.newSource("assets/death.wav", "static")
     self.deathSound:setLooping(false)
-    self.deathSound:setVolume(0.2)
+    self.deathSound:setVolume(1)
 end
 
 function Player:CreateParticles()

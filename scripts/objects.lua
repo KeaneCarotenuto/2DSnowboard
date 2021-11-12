@@ -1,5 +1,18 @@
+-- Bachelor of Software Engineering
+-- Media Design School
+-- Auckland
+-- New Zealand
+--
+-- (c) 2021 Media Design School
+--
+-- File Name   : objects.lua
+-- Description : manages the physics objects, and terrain
+-- Author      : Keane Carotenuto
+-- Mail        : KeaneCarotenuto@gmail.com
+
 --create a list of physics objects
 physicsObjects = {}
+physicsObjects.category = {board = 1, bodyParts = 2}
 
 physicsObjects.oldTerrain = nil
 
@@ -279,6 +292,21 @@ function ResetTerrain()
     physicsObjects.oldTerrain = nil
 
     CreateTerrain(0,0)
+end
+
+function TerrainUpdate(dt)
+    --generate new terrain if the player is near the edge of the screen
+    if physicsObjects.terrain.lastPointX < Player.board.body:getX() + love.graphics.getWidth() then
+        --if old terrain exists, destroy it
+        if physicsObjects.oldTerrain ~= nil and physicsObjects.oldTerrain.body ~= nil then
+            physicsObjects.oldTerrain.body:destroy()
+        end
+
+        physicsObjects.oldTerrain = physicsObjects.terrain
+
+        --create a new terrain
+        CreateTerrain(physicsObjects.terrain.lastPointX, physicsObjects.terrain.lastPointY)
+    end
 end
 
 return physicsObjects
