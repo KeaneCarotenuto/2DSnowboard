@@ -25,8 +25,8 @@ function CreateTerrain(_x, _y)
     --Create a list of points, starting at (0,0), ending at (love.graphics.getWidth(), 0), with a random height between -10 and 10
     local terrainPoints = {}
     for i = 0, love.graphics.getWidth(), 1 do
-        table.insert(terrainPoints, _x + (i * 40))
-        table.insert(terrainPoints, _y + ((i == 0 and 0 or math.random(-100, 1000)) + i*10) * 2) 
+        table.insert(terrainPoints, _x + (i * 60))
+        table.insert(terrainPoints, _y + ((i == 0 and 0 or math.random(-100, 1000)) + i*10) * 3) 
     end
 
     --loop through the list of points and average the height based on the points around it
@@ -142,6 +142,16 @@ function CreateTerrain(_x, _y)
     --insert draw function
     function physicsObjects.terrain:Draw()
         cam:attach()
+
+        if SimpleGraphics then
+            --draw terrain as line by getting shape points
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.setLineWidth(10)
+            love.graphics.line(physicsObjects.terrain.body:getWorldPoints(physicsObjects.terrain.shape:getPoints()))
+            love.graphics.setLineWidth(1)
+            cam:detach()
+            return
+        end
 
         --get the min and max screen coords
         local minX = cam.x - (love.graphics.getWidth() / 2 + 100) / cam.scale

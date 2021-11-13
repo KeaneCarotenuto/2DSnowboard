@@ -31,9 +31,11 @@ Player = {
     rightY = 0,
     isGrounded = false,
     firstGround = false,
-    giveBoost = false,
+    boostAmount = 0,
     spaceHeld = false,
     alive = true,
+    bestFlips = 0,
+    bestSpeed = 0,
 
     -- x = 0,
     -- y = 0,
@@ -65,7 +67,7 @@ function Player:Update(dt)
     if self.alive then
         if (math.deg(math.abs(self.board.body:getAngle() - self.lastFlipAngle)) > 360) then
             self:AddFlip()
-            self.giveBoost = true
+            self.boostAmount = self.boostAmount + 1
         end
     
         local nearestX , nearestY = GetNearest(self.x, self.y)
@@ -74,8 +76,8 @@ function Player:Update(dt)
         --ground check position
         local groundCheckX = self.x - upX * 20
         local groundCheckY = self.y - upY * 20
-        local personCheckX = self.x + upX * 75
-        local personCheckY = self.y + upY * 75
+        local personCheckX = self.x + upX * 65
+        local personCheckY = self.y + upY * 65
     
         if groundCheckY <= nearestY then
             self.isGrounded = false
@@ -87,7 +89,7 @@ function Player:Update(dt)
             if self.isGrounded == false then
                 if (math.deg(math.abs(self.board.body:getAngle() - self.lastFlipAngle)) > 180) then
                     Player:AddFlip()    
-                    self.giveBoost = true
+                    self.boostAmount = self.boostAmount + 1
                 end
             end
             self.isGrounded = true
@@ -140,7 +142,7 @@ function Player:Update(dt)
         end
     
         --apply linear drag to the redBall
-        self.board.body:applyForce(-self.board.body:getLinearVelocity() * 0.01, 0)
+        self.board.body:applyForce(-self.board.body:getLinearVelocity() * 0.005, 0)
     
     
         --cap the speed of the physicsObjects.redBall to 200
@@ -231,11 +233,11 @@ end
 
 function Player:GroundCollision(a,b,coll)
     --check if player is grounded
-    if Player.giveBoost then
+    if Player.boostAmount > 0 then
         --apply right impulse to player
         Player.board.body:applyLinearImpulse(Player.rightX * 20, Player.rightY * 20)
-        Player.maxVel = Player.maxVel + 25
-        Player.giveBoost = false
+        Player.maxVel = Player.maxVel + (25 * math.pow(Player.boostAmount, 2))
+        Player.boostAmount = 0
     end
 end
 
@@ -249,6 +251,21 @@ function Player:Die()
 
     StartFade(0.2)
     NextScene = Scenes.gameOver
+
+    --update bestFlips and bestSpeed
+    if self.flips > self.bestFlips then
+        self.bestFlips = self.flips
+    end
+    if self.maxVel > self.bestSpeed then
+        self.bestSpeed = self.maxVel
+    end
+
+    local success, message = love.filesystem.write( "HIGHSCORE", self.bestFlips .. "\n" .. self.bestSpeed)
+    if success then 
+        print ('file created')
+    else 
+        print ('file not created: '..message)
+    end
 
     --empty the list
     self.bodyParts = {}
