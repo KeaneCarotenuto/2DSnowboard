@@ -413,6 +413,17 @@ function DrawGameUI()
     love.graphics.printf("MAX " .. maxVal .. " KMH", -20, 60, love.graphics.getWidth(), "right")
     love.graphics.setNewFont(20);
 
+    --draw the distance to the last terrain point
+    local dist = math.floor((physicsObjects.terrain:GetLastPoint() - Player:GetPos()) / love.physics.getMeter())
+    if (dist <= 1000) then
+        love.graphics.setNewFont(30);
+        love.graphics.setColor(0, 0, 0)
+        
+        love.graphics.printf("NEXT PEAK\n" .. dist .. "m", -29, love.graphics.getHeight() - 101, love.graphics.getWidth(), "right")
+        love.graphics.setColor(1, 0, 0)
+        love.graphics.printf("NEXT PEAK\n" .. dist .. "m", -30, love.graphics.getHeight() - 100, love.graphics.getWidth(), "right")
+    end
+
 end
 
 function Reset()
